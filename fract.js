@@ -1,4 +1,5 @@
 function fract() {
+  var OFFSCREEN_DIM = 1024;
   var canvas = document.getElementById('fract-canvas');
 
   var gl = canvas.getContext('webgl') ||
@@ -13,8 +14,11 @@ function fract() {
       "uniform mat4 uMVMatrix;\n"+
       "uniform mat4 uPMatrix;\n"+
 
+      "varying vec2 vTexCoord;\n"+
+
       "void main(void) {\n"+
       "  gl_Position = uPMatrix * uMVMatrix * vec4(aVertex, 1.0);\n"+
+      "  vTexCoord = (aVertex.xy + 1.0) / 2.0;\n"+
       "}\n"+
 
       "");
@@ -25,10 +29,14 @@ function fract() {
   gl.shaderSource(fs, ""+
       "precision mediump float;\n"+
 
+      "uniform vec4 uScale;\n"+
       "uniform vec4 uColor;\n"+
+      "uniform sampler2D uSamp;\n"+
+
+      "varying vec2 vTexCoord;\n"+
 
       "void main(void) {\n"+
-      "  gl_FragColor = uColor;\n"+
+      "  gl_FragColor = uScale * (uColor + texture2D(uSamp, vTexCoord));\n"+
       "}\n"+
 
       "");
@@ -46,8 +54,11 @@ function fract() {
   gl.enableVertexAttribArray(attrVertex);
 
   var unifColor = gl.getUniformLocation(shader, 'uColor');
+  var unifScale = gl.getUniformLocation(shader, 'uScale');
   var unifMVMatrix = gl.getUniformLocation(shader, 'uMVMatrix');
   var unifPMatrix = gl.getUniformLocation(shader, 'uPMatrix');
+
+  var colorScale = vec4.fromValues(1.0, 1.0, 1.0, 1.0);
 
   var colors = [
     vec4.fromValues(1.0, 0.0, 0.0, 1.0),
@@ -56,7 +67,6 @@ function fract() {
     vec4.fromValues(0.5, 0.5, 0.0, 1.0),
     vec4.fromValues(0.5, 0.0, 0.5, 1.0),
     vec4.fromValues(0.0, 0.5, 0.5, 1.0),
-    vec4.fromValues(0.3, 0.3, 0.3, 1.0),
     ];
 
   var shapes = [
@@ -69,38 +79,53 @@ function fract() {
                            -0.283, -0.283, 0.0,
                            -0.283,  0.283, 0.0,
                            ]),
-    makeBufferFloat32(gl, [ -0.348,  0.200, 0.0,
+    makeBufferFloat32(gl, [-0.348,  0.200, 0.0,
                             0.348,  0.200, 0.0,
 			    0.000, -0.400, 0.0,
                            ]),
+    makeBufferFloat32(gl, [ 0.400,  0.000, 0.0,
+                            0.000, -0.400, 0.0,
+                           -0.400,  0.000, 0.0,
+                            0.000,  0.400, 0.0,
+                           ]),
     ];
+  var lengths = [ 3, 4, 3, 4 ];
 
-  var lengths = [ 3, 4, 3 ];
+  var texScale = vec4.fromValues(1.0, 1.0, 1.0, 0.99);
+  var texColor = vec4.fromValues(0.0, 0.0, 0.0, 0.0);
+  var texShape = makeBufferFloat32(gl, [-0.99,  0.99, 0.0,
+                                         0.99,  0.99, 0.0,
+					 0.99, -0.99, 0.0,
+					-0.99, -0.99, 0.0,
+					]);
 
   function renderStep(depth) {
     var mv = mat4.identity(mat4.create())
     gl.uniformMatrix4fv(unifMVMatrix, false, mv);
 
     // render the shape
+    gl.bindTexture(gl.TEXTURE_2D, null);
     gl.bindBuffer(gl.ARRAY_BUFFER, shapes[depth%shapes.length]);
     gl.vertexAttribPointer(attrVertex, 3, gl.FLOAT, false, 0, 0);
     gl.uniform4fv(unifColor, colors[depth%colors.length]);
+    gl.uniform4fv(unifScale, colorScale);
     gl.drawArrays(gl.TRIANGLE_FAN, 0, lengths[depth%lengths.length]);
 
     // render the branches
     var mr = mat4.identity(mat4.create());
-    mr = mat4.rotateZ(mr, mr, Math.PI / 3.0);
-    mv = mat4.scale(mv, mv, [0.667, 0.667, 0]);
-    mv = mat4.translate(mv, mv, [0.667, 0, 0]);
-
-    depth = depth + 1;
-    for(var i = 0; i < 6; ++i) {
-      mv = mat4.multiply(mv, mr, mv);
+    mr = mat4.rotateZ(mr, mr, Math.PI * 2.0 / 3.0);
+    mv = mat4.scale(mv, mv, [0.65, 0.60, 0]);
+    mv = mat4.translate(mv, mv, [0.3, 0, 0]);
+    mv = mat4.rotateZ(mv, mv, Math.PI / 20.0);
+    for(var i = 0; i < 3; ++i) {
+      gl.bindTexture(gl.TEXTURE_2D, texCurrent);
       gl.uniformMatrix4fv(unifMVMatrix, false, mv);
-      gl.bindBuffer(gl.ARRAY_BUFFER, shapes[depth%shapes.length]);
+      gl.bindBuffer(gl.ARRAY_BUFFER, texShape);
       gl.vertexAttribPointer(attrVertex, 3, gl.FLOAT, false, 0, 0);
-      gl.uniform4fv(unifColor, colors[depth%colors.length]);
-      gl.drawArrays(gl.TRIANGLE_FAN, 0, lengths[depth%lengths.length]);
+      gl.uniform4fv(unifColor, texColor);
+      gl.uniform4fv(unifScale, texScale);
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+      mv = mat4.multiply(mv, mr, mv);
     }
   }
 
@@ -108,14 +133,14 @@ function fract() {
   gl.bindTexture(gl.TEXTURE_2D, texCurrent);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 512,
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, OFFSCREEN_DIM, OFFSCREEN_DIM,
       0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
   var texNext = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texNext);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 512,
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, OFFSCREEN_DIM, OFFSCREEN_DIM,
       0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
   function swapTextures() {
@@ -127,12 +152,13 @@ function fract() {
   var offdepth = gl.createRenderbuffer();
   gl.bindRenderbuffer(gl.RENDERBUFFER, offdepth);
   gl.renderbufferStorage(gl.RENDERBUFFER,
-      gl.DEPTH_COMPONENT16, 512, 512);
+      gl.DEPTH_COMPONENT16, OFFSCREEN_DIM, OFFSCREEN_DIM);
 
   var offscreen = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, offscreen);
   gl.framebufferRenderbuffer(gl.FRAMEBUFFER,
       gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, offdepth);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
   var step = 0;
 
@@ -141,7 +167,7 @@ function fract() {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, offscreen);
 
-    gl.viewport(0, 0, 512, 512);
+    gl.viewport(0, 0, OFFSCREEN_DIM, OFFSCREEN_DIM);
     gl.uniformMatrix4fv(unifPMatrix, false,
         mat4.ortho(mat4.create(), -1, 1, -1, 1, -1, 1));
     gl.clearColor(0.0, 0.0, 0.0, 0.0);
@@ -150,9 +176,10 @@ function fract() {
         gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texCurrent, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    for(i = 4; 0 < i; --i) {
+    for(i = 11; 0 < i; --i) {
       gl.framebufferTexture2D(gl.FRAMEBUFFER,
           gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texNext, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
       renderStep(i+step);
       swapTextures();
     }
@@ -161,8 +188,8 @@ function fract() {
 
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.uniformMatrix4fv(unifPMatrix, false,
-        mat4.ortho(mat4.create(), -aspect, aspect, -1, 1, -1, 1));
-    gl.clearColor(0.4, 0.4, 0.4, 1.0);
+        mat4.ortho(mat4.create(), -aspect*0.8, aspect*0.8, -0.8, 0.8, -1, 1));
+    gl.clearColor(0.2, 0.2, 0.2, 1.0);
 
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -171,8 +198,11 @@ function fract() {
     ++step;
   }
 
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.enable(gl.BLEND);
+
   render();
-  setInterval(render, 200);
+  setInterval(render, 150);
 
 }
 
