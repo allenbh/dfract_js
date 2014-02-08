@@ -1,5 +1,15 @@
 function fract() {
+  var DEBUG_TEXBOX = 0;
   var OFFSCREEN_DIM = 1024;
+  var OFFSCREEN_SCALE = 1.50;
+  var DEPTH = 40;
+  var BRANCH = 2;
+  var SCALEW = 0.72;
+  var SCALEH = 0.72;
+  var TRANS = 0.50;
+  var ROTATE = 0.55;
+  var ALPHA = 1.0;
+
   var canvas = document.getElementById('fract-canvas');
 
   var gl = canvas.getContext('webgl') ||
@@ -18,7 +28,7 @@ function fract() {
 
       "void main(void) {\n"+
       "  gl_Position = uPMatrix * uMVMatrix * vec4(aVertex, 1.0);\n"+
-      "  vTexCoord = (aVertex.xy + 1.0) / 2.0;\n"+
+      "  vTexCoord = (aVertex.xy / "+OFFSCREEN_SCALE+" + 1.0) / 2.0;\n"+
       "}\n"+
 
       "");
@@ -91,13 +101,15 @@ function fract() {
     ];
   var lengths = [ 3, 4, 3, 4 ];
 
-  var texScale = vec4.fromValues(1.0, 1.0, 1.0, 0.99);
+  var texScale = vec4.fromValues(1.0, 1.0, 1.0, ALPHA);
   var texColor = vec4.fromValues(0.0, 0.0, 0.0, 0.0);
-  var texShape = makeBufferFloat32(gl, [-0.99,  0.99, 0.0,
-                                         0.99,  0.99, 0.0,
-					 0.99, -0.99, 0.0,
-					-0.99, -0.99, 0.0,
-					]);
+  var texShape = makeBufferFloat32(gl, [
+		  -0.99*OFFSCREEN_SCALE,  0.99*OFFSCREEN_SCALE, 0.0,
+		   0.99*OFFSCREEN_SCALE,  0.99*OFFSCREEN_SCALE, 0.0,
+		   0.99*OFFSCREEN_SCALE, -0.99*OFFSCREEN_SCALE, 0.0,
+		  -0.99*OFFSCREEN_SCALE, -0.99*OFFSCREEN_SCALE, 0.0,
+		  -0.99*OFFSCREEN_SCALE,  0.99*OFFSCREEN_SCALE, 0.0,
+		  ]);
 
   function renderStep(depth) {
     var mv = mat4.identity(mat4.create())
@@ -113,19 +125,30 @@ function fract() {
 
     // render the branches
     var mr = mat4.identity(mat4.create());
-    mr = mat4.rotateZ(mr, mr, Math.PI * 2.0 / 3.0);
-    mv = mat4.scale(mv, mv, [0.65, 0.60, 0]);
-    mv = mat4.translate(mv, mv, [0.3, 0, 0]);
-    mv = mat4.rotateZ(mv, mv, Math.PI / 20.0);
-    for(var i = 0; i < 3; ++i) {
-      gl.bindTexture(gl.TEXTURE_2D, texCurrent);
+    mr = mat4.rotateZ(mr, mr, Math.PI * 2.0 / BRANCH);
+    mv = mat4.scale(mv, mv, [SCALEW, SCALEH, 0]);
+    mv = mat4.translate(mv, mv, [TRANS, 0, 0]);
+    mv = mat4.rotateZ(mv, mv, Math.PI * ROTATE);
+    gl.bindTexture(gl.TEXTURE_2D, texCurrent);
+    gl.bindBuffer(gl.ARRAY_BUFFER, texShape);
+    gl.vertexAttribPointer(attrVertex, 3, gl.FLOAT, false, 0, 0);
+    gl.uniform4fv(unifColor, texColor);
+    gl.uniform4fv(unifScale, texScale);
+    for(var i = 0; i < BRANCH; ++i) {
       gl.uniformMatrix4fv(unifMVMatrix, false, mv);
-      gl.bindBuffer(gl.ARRAY_BUFFER, texShape);
-      gl.vertexAttribPointer(attrVertex, 3, gl.FLOAT, false, 0, 0);
-      gl.uniform4fv(unifColor, texColor);
-      gl.uniform4fv(unifScale, texScale);
       gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
       mv = mat4.multiply(mv, mr, mv);
+    }
+
+    // render texture boxes (for debugging)
+    if(depth < DEBUG_TEXBOX) {
+      gl.uniform4fv(unifColor, colors[depth%colors.length]);
+      gl.uniform4fv(unifScale, colorScale);
+      for(var i = 0; i < BRANCH; ++i) {
+        gl.uniformMatrix4fv(unifMVMatrix, false, mv);
+        gl.drawArrays(gl.LINE_STRIP, 0, 5);
+        mv = mat4.multiply(mv, mr, mv);
+      }
     }
   }
 
@@ -169,14 +192,17 @@ function fract() {
 
     gl.viewport(0, 0, OFFSCREEN_DIM, OFFSCREEN_DIM);
     gl.uniformMatrix4fv(unifPMatrix, false,
-        mat4.ortho(mat4.create(), -1, 1, -1, 1, -1, 1));
+        mat4.ortho(mat4.create(),
+	       	-OFFSCREEN_SCALE, OFFSCREEN_SCALE,
+	       	-OFFSCREEN_SCALE, OFFSCREEN_SCALE,
+	       	-1, 1));
     gl.clearColor(0.0, 0.0, 0.0, 0.0);
 
     gl.framebufferTexture2D(gl.FRAMEBUFFER,
         gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texCurrent, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    for(i = 11; 0 < i; --i) {
+    for(i = DEPTH; 0 < i; --i) {
       gl.framebufferTexture2D(gl.FRAMEBUFFER,
           gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texNext, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -198,7 +224,9 @@ function fract() {
     ++step;
   }
 
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.blendFuncSeparate(
+		  gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA,
+		  gl.SRC_ALPHA, gl.DST_ALPHA);
   gl.enable(gl.BLEND);
 
   render();
