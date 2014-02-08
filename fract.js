@@ -4,35 +4,36 @@ function fract() {
   var gl = canvas.getContext('webgl') ||
     canvas.getContext('webgl-experimental');
   if(!gl) return;
+  document.gl = gl;
 
   var vs = gl.createShader(gl.VERTEX_SHADER);
   gl.shaderSource(vs, ""+
-      "attribute vec3 aVertexPosition;\n"+
-      "attribute vec4 aVertexColor;\n"+
+      "attribute vec3 aVertex;\n"+
 
       "uniform mat4 uMVMatrix;\n"+
       "uniform mat4 uPMatrix;\n"+
 
-      "varying lowp vec4 vColor;\n"+
-
       "void main(void) {\n"+
-      "  gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);\n"+
-      "  vColor = aVertexColor;\n"+
+      "  gl_Position = uPMatrix * uMVMatrix * vec4(aVertex, 1.0);\n"+
       "}\n"+
 
       "");
   gl.compileShader(vs);
+  console.log(gl.getShaderInfoLog(vs));
 
   var fs = gl.createShader(gl.FRAGMENT_SHADER);
   gl.shaderSource(fs, ""+
-      "varying lowp vec4 vColor;\n"+
+      "precision mediump float;\n"+
+
+      "uniform vec4 uColor;\n"+
 
       "void main(void) {\n"+
-      "  gl_FragColor = vColor;\n"+
+      "  gl_FragColor = uColor;\n"+
       "}\n"+
 
       "");
   gl.compileShader(fs);
+  console.log(gl.getShaderInfoLog(fs));
 
   var shader = gl.createProgram();
   gl.attachShader(shader, vs);
@@ -41,23 +42,21 @@ function fract() {
 
   gl.useProgram(shader);
 
-  var attrVertexPosition = gl.getAttribLocation(shader, 'aVertexPosition');
-  gl.enableVertexAttribArray(attrVertexPosition);
+  var attrVertex = gl.getAttribLocation(shader, 'aVertex');
+  gl.enableVertexAttribArray(attrVertex);
 
-  var attrVertexColor = gl.getAttribLocation(shader, 'aVertexColor');
-  gl.enableVertexAttribArray(attrVertexColor);
-
+  var unifColor = gl.getUniformLocation(shader, 'uColor');
   var unifMVMatrix = gl.getUniformLocation(shader, 'uMVMatrix');
   var unifPMatrix = gl.getUniformLocation(shader, 'uPMatrix');
 
   var colors = [
-    makeBufferFloat32(gl, repeat(10, [1.0, 0.0, 0.0, 1.0])),
-    makeBufferFloat32(gl, repeat(10, [0.0, 1.0, 0.0, 1.0])),
-    makeBufferFloat32(gl, repeat(10, [0.0, 0.0, 1.0, 1.0])),
-    makeBufferFloat32(gl, repeat(10, [0.5, 0.5, 0.0, 1.0])),
-    makeBufferFloat32(gl, repeat(10, [0.5, 0.0, 0.5, 1.0])),
-    makeBufferFloat32(gl, repeat(10, [0.0, 0.5, 0.5, 1.0])),
-    makeBufferFloat32(gl, repeat(10, [0.3, 0.3, 0.3, 1.0])),
+    vec4.fromValues(1.0, 0.0, 0.0, 1.0),
+    vec4.fromValues(0.0, 1.0, 0.0, 1.0),
+    vec4.fromValues(0.0, 0.0, 1.0, 1.0),
+    vec4.fromValues(0.5, 0.5, 0.0, 1.0),
+    vec4.fromValues(0.5, 0.0, 0.5, 1.0),
+    vec4.fromValues(0.0, 0.5, 0.5, 1.0),
+    vec4.fromValues(0.3, 0.3, 0.3, 1.0),
     ];
 
   var shapes = [
@@ -84,9 +83,8 @@ function fract() {
 
     // render the shape
     gl.bindBuffer(gl.ARRAY_BUFFER, shapes[depth%shapes.length]);
-    gl.vertexAttribPointer(attrVertexPosition, 3, gl.FLOAT, false, 0, 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, colors[depth%colors.length]);
-    gl.vertexAttribPointer(attrVertexColor, 4, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(attrVertex, 3, gl.FLOAT, false, 0, 0);
+    gl.uniform4fv(unifColor, colors[depth%colors.length]);
     gl.drawArrays(gl.TRIANGLE_FAN, 0, lengths[depth%lengths.length]);
 
     // render the branches
@@ -100,9 +98,8 @@ function fract() {
       mv = mat4.multiply(mv, mr, mv);
       gl.uniformMatrix4fv(unifMVMatrix, false, mv);
       gl.bindBuffer(gl.ARRAY_BUFFER, shapes[depth%shapes.length]);
-      gl.vertexAttribPointer(attrVertexPosition, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ARRAY_BUFFER, colors[depth%colors.length]);
-      gl.vertexAttribPointer(attrVertexColor, 4, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribPointer(attrVertex, 3, gl.FLOAT, false, 0, 0);
+      gl.uniform4fv(unifColor, colors[depth%colors.length]);
       gl.drawArrays(gl.TRIANGLE_FAN, 0, lengths[depth%lengths.length]);
     }
   }
@@ -177,7 +174,6 @@ function fract() {
   render();
   setInterval(render, 200);
 
-  document.gl = gl;
 }
 
 function range(n) {
