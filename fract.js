@@ -1,14 +1,16 @@
 function fract() {
-  var DEBUG_TEXBOX = 0;
+  // Constants
   var OFFSCREEN_DIM = 1024;
-  var OFFSCREEN_SCALE = 1.50;
-  var DEPTH = 40;
-  var BRANCH = 2;
-  var SCALEW = 0.72;
-  var SCALEH = 0.72;
-  var TRANS = 0.50;
-  var ROTATE = 0.55;
+  var OFFSCREEN_SCALE = 1.8;
+  // Variables
+  var DEPTH = 10;
+  var BRANCH = 4;
+  var SCALEW = 0.53;
+  var SCALEH = 0.53;
+  var TRANS = 0.5;
+  var ROTATE = -0.1;
   var ALPHA = 1.0;
+  var DEBUG_TEXBOX = 0;
 
   var canvas = document.getElementById('fract-canvas');
 
@@ -183,8 +185,6 @@ function fract() {
       gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, offdepth);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-  var step = 0;
-
   function render() {
     var aspect = 1.0 * canvas.width / canvas.height;
 
@@ -206,7 +206,7 @@ function fract() {
       gl.framebufferTexture2D(gl.FRAMEBUFFER,
           gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texNext, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      renderStep(i+step);
+      renderStep(i);
       swapTextures();
     }
 
@@ -214,14 +214,12 @@ function fract() {
 
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.uniformMatrix4fv(unifPMatrix, false,
-        mat4.ortho(mat4.create(), -aspect*0.8, aspect*0.8, -0.8, 0.8, -1, 1));
+        mat4.ortho(mat4.create(), -aspect*1.2, aspect*1.2, -1.2, 1.2, -1, 1));
     gl.clearColor(0.2, 0.2, 0.2, 1.0);
 
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    renderStep(0+step);
-
-    ++step;
+    renderStep(0);
   }
 
   gl.blendFuncSeparate(
@@ -229,9 +227,52 @@ function fract() {
 		  gl.SRC_ALPHA, gl.DST_ALPHA);
   gl.enable(gl.BLEND);
 
-  render();
-  setInterval(render, 150);
+  var input;
 
+  input = document.getElementById('fract-depth-ctrl');
+  input.value = DEPTH;
+  input.onchange = function() {
+    DEPTH = this.value;
+    window.requestAnimationFrame(render);
+  };
+
+  input = document.getElementById('fract-branch-ctrl');
+  input.value = BRANCH;
+  input.onchange = function() {
+    BRANCH = this.value;
+    window.requestAnimationFrame(render);
+  };
+
+  input = document.getElementById('fract-trans-ctrl');
+  input.value = TRANS;
+  input.onchange = function() {
+    TRANS = this.value;
+    window.requestAnimationFrame(render);
+  };
+
+  input = document.getElementById('fract-scale-ctrl');
+  input.value = SCALEW;
+  input.onchange = function() {
+    SCALEW = this.value;
+    SCALEH = this.value;
+    window.requestAnimationFrame(render);
+  };
+
+  input = document.getElementById('fract-rotate-ctrl');
+  input.value = ROTATE;
+  input.onchange = function() {
+    ROTATE = this.value;
+    window.requestAnimationFrame(render);
+  };
+
+  input = document.getElementById('fract-debug-ctrl');
+  input.value = DEBUG_TEXBOX;
+  input.onchange = function() {
+    DEBUG_TEXBOX = this.value;
+    window.requestAnimationFrame(render);
+  };
+
+  render();
 }
 
 function range(n) {

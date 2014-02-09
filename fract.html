@@ -1,12 +1,103 @@
 <html>
-  <head>
-    <title>Fract</title>
-   <script src="gl-matrix-min.js" type="text/javascript"></script>
-    <script src="fract.js" type="text/javascript"></script>
-  </head>
-  <body onload="fract()">
-    <canvas id="fract-canvas" width="640" height="480">
+<head>
+<title>DFract JS</title>
+<script src="gl-matrix-min.js" type="text/javascript"></script>
+<script src="fract.js" type="text/javascript"></script>
+</head>
+<body onload="fract()">
+
+<div style="clear:both;width:900">
+
+  <h1>Dynamic Fractals in Javascript</h1>
+
+  <p>This application renders iterative fractals.  The fractals come from a
+  repeated operation of drawing shapes, then smaller shapes around those, and
+  so on.  After a few steps, this repeated process will generate a lot of
+  shapes.  If each shape were drawn individually, the rendering of the fractal
+  would take along time, minutes or hours.  This program uses a dynamic
+  programming technique to speed up the rendering, so billions or more shapes
+  can be drawn in just a fraction of a second.</p>
+
+</div>
+
+<div style="float:left">
+  <canvas id="fract-canvas" width="640" height="480">
     Your browser does not appear to support WebGL.
-    </canvas>
-  </body>
+  </canvas>
+</div>
+
+<div style="float:left">
+  <form id="fract-ctrl" action="#">
+    <h2>Controls:</h2>
+    <table>
+      <tr><td>Fractal Depth:</td><td>
+          <input type="range" id="fract-depth-ctrl" min="0" max="30"/>
+      </td></tr>
+      <tr><td>Branch Factor:</td><td>
+          <input type="range" id="fract-branch-ctrl" min="1" max="9"/>
+      </td></tr>
+      <tr><td>Translate:</td><td>
+          <input type="range" id="fract-trans-ctrl" min="0.3" max="0.7" step="0.01"/>
+      </td></tr>
+      <tr><td>Scale:</td><td>
+          <input type="range" id="fract-scale-ctrl" min="0.3" max="0.7" step="0.01"/>
+      </td></tr>
+      <tr><td>Rotate:</td><td>
+          <input type="range" id="fract-rotate-ctrl" min="-1.0" max="1.0" step="0.01"/>
+      </td></tr>
+      <tr><td>Off-screen Borders:</td><td>
+          <input type="range" id="fract-debug-ctrl" min="0" max="3" step="1"/>
+      </td></tr>
+    </table>
+  </form>
+</div>
+
+<div style="clear:both;width:900;padding-top:1em">
+
+  <h2>Dynamic Programming</h2>
+
+  <p>So, how do you draw over a billion shapes in the time it takes to
+  blink?</p>
+
+  <p>The key is dynamic programming.  That is a term used in computer science
+  meaning that the result of some computational work is reused in repeated
+  operations.  In this case, the repeated work is drawing all the shapes.  Look
+  at the fractal, and see that the smallest shapes are the most repeated.  The
+  work to draw them is also the most reused.  The small shape was drawn only
+  once, then copied all around.  First the one small shape was copied into two,
+  then the two were copied into four, then eight, sixteen, and so on.  Over
+  four billion shapes can be made with just thirty two copying steps.  The
+  program will copy two, three, or more at a time, depending on the branch
+  factor.</p>
+
+  <h2>Controls</h2>
+
+  <p><strong>Fractal Depth:</strong> number of times to repeat drawing smaller
+  and smaller shapes.</p>
+
+  <p><strong>Branch Factor:</strong> number of smaller shapes to draw at each
+  step.</p>
+
+  <p><strong>Translate:</strong> the distance to move the smaller shape away
+  from the center of the larger shape.</p>
+
+  <p><strong>Scale:</strong> the size of the shape relative to the larger
+  shape.</p>
+
+  <p><strong>Rotate:</strong> the orientation of the smaller shape relative to
+  the larger shape.</p>
+
+  <p><strong>Off-screen Borders:</strong> show borders of the off-screen
+  rendering used for dynamic programming.</p>
+
+  <h2>Author</h2>
+
+  <p><strong>Allen Hubbe</strong>
+  <a href="https://www.linkedin.com/in/allenbh">LinkedIn</a>
+  <a href="https://www.github.com/allenbh">GitHub</a>
+  <a href="https://plus.google.com/+AllenHubbe">Google+</a>
+  </p>
+
+</div>
+</body>
 </html>
